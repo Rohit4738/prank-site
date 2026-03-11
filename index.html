@@ -1,1 +1,609 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CLANG</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Black+Ops+One&family=Share+Tech+Mono&display=swap');
 
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --rust: #c0392b;
+    --steel: #95a5a6;
+    --iron: #2c3e50;
+    --spark: #f39c12;
+    --white: #ecf0f1;
+  }
+
+  body {
+    background: #0a0a0a;
+    color: var(--white);
+    font-family: 'Share Tech Mono', monospace;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    cursor: crosshair;
+  }
+
+  /* Scanline overlay */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background: repeating-linear-gradient(
+      0deg,
+      transparent,
+      transparent 2px,
+      rgba(0,0,0,0.15) 2px,
+      rgba(0,0,0,0.15) 4px
+    );
+    pointer-events: none;
+    z-index: 100;
+  }
+
+  /* Vignette */
+  body::after {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background: radial-gradient(ellipse at center, transparent 40%, rgba(0,0,0,0.85) 100%);
+    pointer-events: none;
+    z-index: 99;
+  }
+
+  .pipe-container {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 40px;
+    z-index: 10;
+  }
+
+  /* Giant pipe graphic */
+  .pipe {
+    position: relative;
+    width: 320px;
+    height: 80px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    animation: idle 2s ease-in-out infinite;
+    filter: drop-shadow(0 0 20px rgba(192,57,43,0.4));
+  }
+
+  .pipe-body {
+    width: 100%;
+    height: 56px;
+    background: linear-gradient(180deg,
+      #6b7280 0%,
+      #9ca3af 15%,
+      #d1d5db 30%,
+      #e5e7eb 45%,
+      #c8ccd0 55%,
+      #9ca3af 70%,
+      #6b7280 85%,
+      #4b5563 100%
+    );
+    border-radius: 4px;
+    box-shadow:
+      inset 0 2px 4px rgba(255,255,255,0.3),
+      inset 0 -2px 4px rgba(0,0,0,0.5),
+      0 4px 20px rgba(0,0,0,0.8);
+    position: relative;
+    overflow: hidden;
+  }
+
+  .pipe-body::after {
+    content: '';
+    position: absolute;
+    top: 8px;
+    left: 0; right: 0;
+    height: 3px;
+    background: rgba(255,255,255,0.5);
+    border-radius: 2px;
+  }
+
+  .pipe-end {
+    position: absolute;
+    width: 32px;
+    height: 72px;
+    background: linear-gradient(90deg, #4b5563, #6b7280, #9ca3af, #6b7280, #4b5563);
+    border-radius: 3px;
+    box-shadow: 0 0 10px rgba(0,0,0,0.6);
+  }
+
+  .pipe-end.left { left: -16px; }
+  .pipe-end.right { right: -16px; }
+
+  @keyframes idle {
+    0%, 100% { transform: rotate(-1deg) translateY(0); }
+    50% { transform: rotate(1deg) translateY(-3px); }
+  }
+
+  @keyframes clang {
+    0%   { transform: rotate(-1deg) translateY(0) scale(1); }
+    10%  { transform: rotate(-8deg) translateY(-15px) scale(1.04); }
+    20%  { transform: rotate(6deg) translateY(5px) scale(0.97); }
+    35%  { transform: rotate(-4deg) translateY(-8px) scale(1.02); }
+    50%  { transform: rotate(3deg) translateY(3px) scale(0.99); }
+    65%  { transform: rotate(-2deg) translateY(-4px) scale(1.01); }
+    80%  { transform: rotate(1deg) translateY(2px) scale(1); }
+    100% { transform: rotate(-1deg) translateY(0) scale(1); }
+  }
+
+  @keyframes screen-shake {
+    0%, 100% { transform: translate(0,0) rotate(0deg); }
+    10% { transform: translate(-8px, -6px) rotate(-0.5deg); }
+    20% { transform: translate(7px, 5px) rotate(0.3deg); }
+    30% { transform: translate(-5px, 8px) rotate(-0.2deg); }
+    40% { transform: translate(6px, -4px) rotate(0.4deg); }
+    50% { transform: translate(-4px, 6px) rotate(-0.3deg); }
+    60% { transform: translate(5px, -3px) rotate(0.2deg); }
+    70% { transform: translate(-3px, 4px) rotate(-0.1deg); }
+    80% { transform: translate(4px, -2px) rotate(0.1deg); }
+    90% { transform: translate(-2px, 2px) rotate(0); }
+  }
+
+  .pipe.ringing {
+    animation: clang 0.6s ease-out;
+  }
+
+  /* Sparks */
+  .sparks {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+  }
+
+  .spark {
+    position: absolute;
+    width: 4px;
+    height: 4px;
+    background: var(--spark);
+    border-radius: 50%;
+    opacity: 0;
+  }
+
+  @keyframes spark-fly {
+    0%   { opacity: 1; transform: translate(0,0) scale(1); }
+    100% { opacity: 0; transform: var(--fly) scale(0); }
+  }
+
+  /* TITLE */
+  .title {
+    font-family: 'Black Ops One', cursive;
+    font-size: clamp(64px, 15vw, 120px);
+    letter-spacing: 8px;
+    color: var(--white);
+    text-shadow:
+      0 0 10px rgba(192,57,43,0.8),
+      0 0 30px rgba(192,57,43,0.5),
+      0 0 60px rgba(192,57,43,0.3),
+      4px 4px 0 #1a0000;
+    line-height: 1;
+    text-align: center;
+    position: relative;
+  }
+
+  .title .sub {
+    font-size: 0.2em;
+    letter-spacing: 20px;
+    display: block;
+    color: var(--steel);
+    text-shadow: none;
+    margin-top: 4px;
+    text-transform: uppercase;
+  }
+
+  /* Controls */
+  .controls {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 20px;
+    width: 320px;
+  }
+
+  .vol-section {
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .vol-label {
+    display: flex;
+    justify-content: space-between;
+    font-size: 11px;
+    letter-spacing: 3px;
+    color: var(--steel);
+    text-transform: uppercase;
+  }
+
+  .vol-value {
+    color: var(--spark);
+    font-size: 14px;
+    font-weight: bold;
+  }
+
+  input[type=range] {
+    -webkit-appearance: none;
+    width: 100%;
+    height: 6px;
+    background: linear-gradient(90deg, var(--rust) var(--pct, 40%), #2c2c2c var(--pct, 40%));
+    border-radius: 0;
+    outline: none;
+    border: 1px solid #333;
+    cursor: pointer;
+  }
+
+  input[type=range]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 18px;
+    height: 28px;
+    background: linear-gradient(180deg, #e5e7eb, #9ca3af);
+    border: 2px solid #4b5563;
+    border-radius: 2px;
+    cursor: grab;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.8);
+  }
+
+  input[type=range]::-webkit-slider-thumb:active { cursor: grabbing; }
+
+  .btn-row {
+    display: flex;
+    gap: 12px;
+    width: 100%;
+  }
+
+  .btn {
+    flex: 1;
+    padding: 14px;
+    font-family: 'Black Ops One', cursive;
+    font-size: 14px;
+    letter-spacing: 3px;
+    border: 2px solid;
+    cursor: pointer;
+    transition: all 0.1s;
+    text-transform: uppercase;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .btn-play {
+    background: var(--rust);
+    border-color: #e74c3c;
+    color: white;
+    box-shadow: 0 0 20px rgba(192,57,43,0.5), inset 0 1px 0 rgba(255,255,255,0.2);
+  }
+
+  .btn-play:hover {
+    background: #e74c3c;
+    box-shadow: 0 0 40px rgba(231,76,60,0.8), inset 0 1px 0 rgba(255,255,255,0.3);
+    transform: translateY(-1px);
+  }
+
+  .btn-play:active { transform: translateY(1px); }
+
+  .btn-stop {
+    background: transparent;
+    border-color: #555;
+    color: var(--steel);
+  }
+
+  .btn-stop:hover {
+    border-color: var(--steel);
+    color: white;
+    background: rgba(255,255,255,0.05);
+  }
+
+  /* Status bar */
+  .status {
+    font-size: 10px;
+    letter-spacing: 4px;
+    color: #555;
+    text-transform: uppercase;
+    text-align: center;
+    height: 16px;
+    transition: color 0.3s;
+  }
+
+  .status.active { color: var(--rust); animation: blink 1s step-end infinite; }
+
+  @keyframes blink {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.3; }
+  }
+
+  /* VU Meter */
+  .vu-meter {
+    display: flex;
+    gap: 3px;
+    align-items: flex-end;
+    height: 40px;
+  }
+
+  .vu-bar {
+    width: 8px;
+    background: #1a1a1a;
+    border: 1px solid #222;
+    position: relative;
+    overflow: hidden;
+    height: 100%;
+  }
+
+  .vu-bar-fill {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background: linear-gradient(to top, #27ae60, #f39c12, #e74c3c);
+    height: 0%;
+    transition: height 0.05s;
+  }
+
+  /* Shake wrapper */
+  #shake-wrap {
+    width: 100%;
+    height: 100%;
+    display: contents;
+  }
+
+  #shake-wrap.shaking {
+    display: block;
+    animation: screen-shake 0.5s ease-out;
+    transform-origin: center center;
+  }
+
+  /* Warning text */
+  .warning {
+    font-size: 9px;
+    letter-spacing: 2px;
+    color: #c0392b;
+    text-align: center;
+    opacity: 0.6;
+  }
+
+  /* Floating metal dust */
+  .dust {
+    position: fixed;
+    width: 2px;
+    height: 2px;
+    background: #666;
+    border-radius: 50%;
+    pointer-events: none;
+    opacity: 0;
+  }
+</style>
+</head>
+<body>
+<div id="shake-wrap">
+  <div class="pipe-container">
+
+    <div class="title">
+      CLANG
+      <span class="sub">metal pipe experience</span>
+    </div>
+
+    <div class="pipe" id="pipe">
+      <div class="pipe-end left"></div>
+      <div class="pipe-body"></div>
+      <div class="pipe-end right"></div>
+      <div class="sparks" id="sparks"></div>
+    </div>
+
+    <div class="vu-meter" id="vu">
+      <!-- bars generated by JS -->
+    </div>
+
+    <div class="controls">
+      <div class="vol-section">
+        <div class="vol-label">
+          <span>Volume Amplification</span>
+          <span class="vol-value" id="vol-display">300%</span>
+        </div>
+        <input type="range" id="vol-slider" min="100" max="1000" value="300" step="10">
+      </div>
+
+      <div class="btn-row">
+        <button class="btn btn-play" id="btn-play" onclick="startAudio()">▶ ENGAGE</button>
+        <button class="btn btn-stop" id="btn-stop" onclick="stopAudio()">■ STOP</button>
+      </div>
+
+      <div class="status" id="status">-- STANDING BY --</div>
+      <div class="warning">⚠ WARNING: VOLUME AMPLIFIED BEYOND UNITY GAIN</div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+  // --- VU meter bars ---
+  const vuEl = document.getElementById('vu');
+  const NUM_BARS = 18;
+  const fills = [];
+  for (let i = 0; i < NUM_BARS; i++) {
+    const bar = document.createElement('div');
+    bar.className = 'vu-bar';
+    const fill = document.createElement('div');
+    fill.className = 'vu-bar-fill';
+    bar.appendChild(fill);
+    vuEl.appendChild(bar);
+    fills.push(fill);
+  }
+
+  // --- Audio setup ---
+  let audioCtx = null;
+  let sourceNode = null;
+  let gainNode = null;
+  let analyser = null;
+  let buffer = null;
+  let playing = false;
+  let animFrame = null;
+  let clangTimeout = null;
+
+  const AUDIO_URL = 'https://github.com/Rohit4738/Repo-for-gitlinks/raw/refs/heads/main/metal-pipe-clang.mp3';
+
+  async function loadAudio(ctx) {
+    const resp = await fetch(AUDIO_URL);
+    const arrayBuf = await resp.arrayBuffer();
+    return await ctx.decodeAudioData(arrayBuf);
+  }
+
+  async function startAudio() {
+    if (playing) return;
+
+    document.getElementById('status').textContent = '-- LOADING --';
+    document.getElementById('status').className = 'status';
+
+    try {
+      audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      gainNode = audioCtx.createGain();
+      analyser = audioCtx.createAnalyser();
+      analyser.fftSize = 64;
+
+      const vol = parseInt(document.getElementById('vol-slider').value) / 100;
+      gainNode.gain.value = vol;
+
+      if (!buffer) {
+        buffer = await loadAudio(audioCtx);
+      }
+
+      function playLoop() {
+        if (!playing) return;
+        sourceNode = audioCtx.createBufferSource();
+        sourceNode.buffer = buffer;
+        sourceNode.connect(gainNode);
+        gainNode.connect(analyser);
+        analyser.connect(audioCtx.destination);
+        sourceNode.start(0);
+        triggerClang();
+        sourceNode.onended = () => {
+          if (playing) playLoop();
+        };
+      }
+
+      playing = true;
+      playLoop();
+      startVU();
+
+      document.getElementById('status').textContent = '● CLANGING ENGAGED';
+      document.getElementById('status').className = 'status active';
+      document.getElementById('btn-play').textContent = '● PLAYING';
+
+    } catch(e) {
+      document.getElementById('status').textContent = 'ERROR: ' + e.message;
+      console.error(e);
+    }
+  }
+
+  function stopAudio() {
+    playing = false;
+    if (sourceNode) { try { sourceNode.stop(); } catch(e){} }
+    if (audioCtx) { audioCtx.close(); audioCtx = null; }
+    buffer = null;
+    cancelAnimationFrame(animFrame);
+    fills.forEach(f => f.style.height = '0%');
+    document.getElementById('status').textContent = '-- STANDING BY --';
+    document.getElementById('status').className = 'status';
+    document.getElementById('btn-play').textContent = '▶ ENGAGE';
+  }
+
+  // VU meter animation
+  function startVU() {
+    const dataArr = new Uint8Array(analyser.frequencyBinCount);
+    function draw() {
+      if (!playing) return;
+      animFrame = requestAnimationFrame(draw);
+      analyser.getByteFrequencyData(dataArr);
+      const avg = dataArr.reduce((a,b) => a+b, 0) / dataArr.length;
+      fills.forEach((fill, i) => {
+        const barVal = dataArr[i] || avg;
+        const pct = Math.min(100, (barVal / 255) * 100 * 1.5);
+        fill.style.height = pct + '%';
+      });
+    }
+    draw();
+  }
+
+  // Pipe clang visual effect
+  function triggerClang() {
+    const pipe = document.getElementById('pipe');
+    pipe.classList.remove('ringing');
+    void pipe.offsetWidth;
+    pipe.classList.add('ringing');
+    spawnSparks();
+    shakeScreen();
+    pipe.addEventListener('animationend', () => pipe.classList.remove('ringing'), { once: true });
+  }
+
+  function spawnSparks() {
+    const container = document.getElementById('sparks');
+    container.innerHTML = '';
+    const count = 12 + Math.floor(Math.random() * 10);
+    for (let i = 0; i < count; i++) {
+      const s = document.createElement('div');
+      s.className = 'spark';
+      const angle = (Math.random() * 360);
+      const dist = 40 + Math.random() * 80;
+      const dx = Math.cos(angle * Math.PI / 180) * dist;
+      const dy = Math.sin(angle * Math.PI / 180) * dist;
+      const x = 40 + Math.random() * 60; // % along pipe
+      s.style.cssText = `
+        left: ${x}%;
+        top: 50%;
+        --fly: translate(${dx}px, ${dy}px);
+        animation: spark-fly ${0.3 + Math.random() * 0.5}s ease-out ${Math.random() * 0.1}s forwards;
+        background: hsl(${30 + Math.random()*30}, 100%, ${60 + Math.random()*30}%);
+        width: ${2 + Math.random() * 4}px;
+        height: ${2 + Math.random() * 4}px;
+      `;
+      container.appendChild(s);
+    }
+  }
+
+  function shakeScreen() {
+    const wrap = document.getElementById('shake-wrap');
+    wrap.classList.remove('shaking');
+    void wrap.offsetWidth;
+    wrap.classList.add('shaking');
+    wrap.addEventListener('animationend', () => wrap.classList.remove('shaking'), { once: true });
+  }
+
+  // Volume slider
+  const slider = document.getElementById('vol-slider');
+  const display = document.getElementById('vol-display');
+
+  slider.addEventListener('input', () => {
+    const val = parseInt(slider.value);
+    display.textContent = val + '%';
+    const pct = ((val - 100) / 900 * 100).toFixed(1) + '%';
+    slider.style.setProperty('--pct', pct);
+    if (gainNode) gainNode.gain.value = val / 100;
+  });
+
+  // Init slider gradient
+  slider.style.setProperty('--pct', '22.2%');
+
+  // Floating dust particles
+  for (let i = 0; i < 20; i++) {
+    const d = document.createElement('div');
+    d.className = 'dust';
+    d.style.cssText = `
+      left: ${Math.random() * 100}vw;
+      top: ${Math.random() * 100}vh;
+      animation: spark-fly ${3 + Math.random() * 5}s ease-in-out ${Math.random() * 5}s infinite;
+      --fly: translate(${(Math.random()-0.5)*100}px, ${(Math.random()-0.5)*100}px);
+      opacity: ${0.1 + Math.random() * 0.3};
+    `;
+    document.body.appendChild(d);
+  }
+</script>
+</body>
+</html>
